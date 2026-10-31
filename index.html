@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>As 5 Linguagens do Amor - Diagnóstico de Casal</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Babel para transpilar React/JSX no navegador -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- React e React DOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.3s ease-in-out forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+
+  <!-- Container Raiz do React -->
+  <div id="root"></div>
+
+  <!-- Código React da Aplicação -->
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+    const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } = window.Recharts || {};
+
+    // CONFIGURAÇÕES DE SEGURANÇA E VOUCHERS
+    const MASTER_KEY = "injavi.adm";
+    const GENERAL_KEY = "CASAL-VIP";
+
+    // Algoritmo matemático determinístico para gerar a chave a partir do e-mail (compatível com Kiwify/Hotmart)
+    function calculateDeterministicKey(email) {
+      const cleanEmail = email.trim().toLowerCase();
+      let hash = 0;
+      for (let i = 0; i < cleanEmail.length; i++) {
+        hash = (hash << 5) - hash + cleanEmail.charCodeAt(i);
+        hash |= 0;
+      }
+      const code = Math.abs(hash).toString(36).toUpperCase().substring(0, 4);
+      const namePart = cleanEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').substring(0, 5).toUpperCase();
+      return `INJAVI-${namePart || 'USER'}-${code}`;
+    }
+
+    // Função utilitária para gerar/obter o ID único do dispositivo (Device Signature)
+    const getDeviceId = () => {
+      let deviceId = localStorage.getItem('device_hardware_uuid');
+      if (!deviceId) {
+        deviceId = 'DEV-' + Math.random().toString(36).substring(2, 10) + '-' + Date.now().toString(36);
+        localStorage.setItem('device_hardware_uuid', deviceId);
+      }
+      return deviceId;
+    };
+
+    const LANGUAGES_INFO = {
+      A: { title: 'Palavras de Afirmação', icon: '💬', color: '#ec4899', desc: 'Elogios, palavras de incentivo e apreciação verbal.' },
+      B: { title: 'Tempo de Qualidade', icon: '⏰', color: '#8b5cf6', desc: 'Atenção plena e momentos dedicados a sós sem distrações.' },
+      C: { title: 'Receber Presentes', icon: '🎁', color: '#f59e0b', desc: 'Símbolos visuais do amor e da lembrança afetuosa.' },
+      D: { title: 'Atos de Serviço', icon: '🛠️', color: '#10b981', desc: 'Ações práticas que facilitam ou agradam o outro.' },
+      E: { title: 'Toque Físico', icon: '🤝', color: '#ef4444', desc: 'Abraços, carinho, mãos dadas e proximidade física.' }
+    };
+
+    const QUESTIONS = [
+      { id: 1, optionA: { text: "Gosto de receber bilhetes ou mensagens de carinho.", lang: "A" }, optionB: { text: "Gosto de ser abraçado(a) pela pessoa que amo.", lang: "E" } },
+      { id: 2, optionA: { text: "Gosto de passar tempo a sós com meu parceiro(a).", lang: "B" }, optionB: { text: "Sinto-me amado(a) quando recebo um presente surpresa.", lang: "C" } },
+      { id: 3, optionA: { text: "Gosto quando meu parceiro(a) me ajuda nas tarefas sem pedir.", lang: "D" }, optionB: { text: "Gosto do contato físico e carinho espontâneo.", lang: "E" } },
+      { id: 4, optionA: { text: "Sinto-me amado(a) quando fazem algo prático por mim.", lang: "D" }, optionB: { text: "Palavras de encorajamento e elogios significam muito.", lang: "A" } },
+      { id: 5, optionA: { text: "Aprecio conversas profundas e exclusivas.", lang: "B" }, optionB: { text: "Gosto de receber lembranças que mostram que pensaram em mim.", lang: "C" } },
+      { id: 6, optionA: { text: "Gosto que reconheçam verbalmente o meu esforço.", lang: "A" }, optionB: { text: "Gosto quando facilitam minha rotina com um favor.", lang: "D" } },
+      { id: 7, optionA: { text: "Toques gentis trazem sensação imediata de paz.", lang: "E" }, optionB: { text: "Presentes mostram cuidado e consideração.", lang: "C" } },
+      { id: 8, optionA: { text: "Passeios a dois reforçam nossa conexão.", lang: "B" }, optionB: { text: "Elogios sinceros mudam totalmente meu dia.", lang: "A" } },
+      { id: 9, optionA: { text: "Gosto de receber presentes com significado especial.", lang: "C" }, optionB: { text: "Gosto de andar de mãos dadas e ficar pertinho.", lang: "E" } },
+      { id: 10, optionA: { text: "Ações práticas valem mais do que belas palavras.", lang: "D" }, optionB: { text: "Ouvir 'eu te amo' de forma expressiva é essencial.", lang: "A" } },
+      { id: 11, optionA: { text: "Estar presente com atenção total me faz sentir especial.", lang: "B" }, optionB: { text: "Gestos prestativos de ajuda aliviam meu estresse.", lang: "D" } },
+      { id: 12, optionA: { text: "Gosto de ser abraçado(a) forte ao reencontrar meu parceiro(a).", lang: "E" }, optionB: { text: "Mensagens carinhosas ao longo do dia significam muito.", lang: "A" } },
+      { id: 13, optionA: { text: "Reconhecimento verbal me motiva.", lang: "A" }, optionB: { text: "Um mimo inesperado alegra minha semana.", lang: "C" } },
+      { id: 14, optionA: { text: "Companhia dedicada nas minhas atividades é ótimo.", lang: "B" }, optionB: { text: "Sinto amor através da proximidade e toque físico.", lang: "E" } },
+      { id: 15, optionA: { text: "Gosto que elogiem minhas conquistas e esforços.", lang: "A" }, optionB: { text: "Sei que me ama quando faz coisas difíceis para me aliviar.", lang: "D" } },
+      { id: 16, optionA: { text: "Gosto de toques afetuosos enquanto passamos um pelo outro.", lang: "E" }, optionB: { text: "Gosto quando me escutam com atenção e empatia.", lang: "B" } },
+      { id: 17, optionA: { text: "Sinto-me amado(a) quando me ajudam nas tarefas de casa.", lang: "D" }, optionB: { text: "Adoro a sensação de receber um presente pensado para mim.", lang: "C" } },
+      { id: 18, optionA: { text: "Gosto quando elogiam minha aparência e estilo.", lang: "A" }, optionB: { text: "Sinto-me amado(a) quando tiram tempo para ouvir meus sentimentos.", lang: "B" } },
+      { id: 19, optionA: { text: "Sinto-me seguro(a) com toques físicos frequentes.", lang: "E" }, optionB: { text: "Atos de serviço práticos me fazem sentir amado(a).", lang: "D" } },
+      { id: 20, optionA: { text: "Aprecio as inúmeras pequenas coisas práticas que fazem por mim.", lang: "D" }, optionB: { text: "Aprecio receber coisas feitas à mão ou escolhidas a dedo.", lang: "C" } },
+      { id: 21, optionA: { text: "Amo a sensação de ter a atenção total e sem distrações.", lang: "B" }, optionB: { text: "Amo quando realizam uma tarefa pesada por mim.", lang: "D" } },
+      { id: 22, optionA: { text: "Comemorações com presentes marcam minha vida.", lang: "C" }, optionB: { text: "Palavras de apoio no momento certo sustentam meu dia.", lang: "A" } },
+      { id: 23, optionA: { text: "Saber que pensaram em mim ao comprar algo me toca.", lang: "C" }, optionB: { text: "Dividir hobbies e passeios juntos me realiza.", lang: "B" } },
+      { id: 24, optionA: { text: "Que façam favores sem eu pedir demonstra amor genuíno.", lang: "D" }, optionB: { text: "Que me abraçarem sem motivo demonstra carinho verdadeiro.", lang: "E" } },
+      { id: 25, optionA: { text: "Ouvir frases de admiração renova minhas energias.", lang: "A" }, optionB: { text: "Ter tempo exclusivo revigora nossa intimidade.", lang: "B" } },
+      { id: 26, optionA: { text: "Um presente simbólico vale mais que muitas promessas.", lang: "C" }, optionB: { text: "Palavras afetuosas valem mais que bens materiais.", lang: "A" } },
+      { id: 27, optionA: { text: "Sinto paz com abraços prolongados e cafuné.", lang: "E" }, optionB: { text: "Sinto paz quando assumem uma responsabilidade minha.", lang: "D" } },
+      { id: 28, optionA: { text: "Atenção focada e diálogo franco é o melhor presente.", lang: "B" }, optionB: { text: "Um embrulho surpresa traz alegria instantânea.", lang: "C" } },
+      { id: 29, optionA: { text: "Servir o outro com atos práticos é prova de amor.", lang: "D" }, optionB: { text: "Dizer com clareza o valor que tenho fortalece a união.", lang: "A" } },
+      { id: 30, optionA: { text: "Contato físico diário mantém a chama acesa.", lang: "E" }, optionB: { text: "Lembranças trazidas de surpresa mostram cuidado.", lang: "C" } }
+    ];
+
+    function App() {
+      // Estado da Trava de Segurança / Paywall
+      const [isUnlocked, setIsUnlocked] = useState(false);
+      const [activationEmail, setActivationEmail] = useState('');
+      const [activationInput, setActivationInput] = useState('');
+      const [activationError, setActivationError] = useState('');
+
+      // Painel Secreto ADM
+      const [showAdminModal, setShowAdminModal] = useState(false);
+      const [adminMasterPassInput, setAdminMasterPassInput] = useState('');
+      const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+      const [adminAuthError, setAdminAuthError] = useState('');
+      const [adminEmailTarget, setAdminEmailTarget] = useState('');
+      const [generatedKeyResult, setGeneratedKeyResult] = useState('');
+
+      // Estados da Aplicação Duo
+      const [activeTab, setActiveTab] = useState('home');
+      const [currentUserRole, setCurrentUserRole] = useState('person1');
+      const [person1Name, setPerson1Name] = useState('Pessoa 1');
+      const [person1Answers, setPerson1Answers] = useState({});
+      const [isPerson1Completed, setIsPerson1Completed] = useState(false);
+      const [person1ManualLang, setPerson1ManualLang] = useState('');
+      const [person1ManualLang2, setPerson1ManualLang2] = useState('');
+
+      const [person2Name, setPerson2Name] = useState('Cônjuge');
+      const [person2Answers, setPerson2Answers] = useState({});
+      const [isPerson2Completed, setIsPerson2Completed] = useState(false);
+      const [person2ManualLang, setPerson2ManualLang] = useState('');
+      const [person2ManualLang2, setPerson2ManualLang2] = useState('');
+
+      const [spouseBirthdate, setSpouseBirthdate] = useState('');
+      const [anniversaryDate, setAnniversaryDate] = useState('');
+      const [completedMissions, setCompletedMissions] = useState({});
+
+      const [answers, setAnswers] = useState({});
+      const [currentIndex, setCurrentIndex] = useState(0);
+      const [isStarted, setIsStarted] = useState(false);
+      const [isCompleted, setIsCompleted] = useState(false);
+      const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+      useEffect(() => {
+        const savedData = localStorage.getItem('love_language_duo_app_data');
+        if (savedData) {
+          try {
+            const parsed = JSON.parse(savedData);
+            if (parsed.isUnlocked !== undefined) setIsUnlocked(parsed.isUnlocked);
+            if (parsed.activationEmail) setActivationEmail(parsed.activationEmail);
+            if (parsed.person1Name) setPerson1Name(parsed.person1Name);
+            if (parsed.person1Answers) setPerson1Answers(parsed.person1Answers);
+            if (parsed.isPerson1Completed !== undefined) setIsPerson1Completed(parsed.isPerson1Completed);
+            if (parsed.person1ManualLang) setPerson1ManualLang(parsed.person1ManualLang);
+            if (parsed.person1ManualLang2) setPerson1ManualLang2(parsed.person1ManualLang2);
+
+            if (parsed.person2Name) setPerson2Name(parsed.person2Name);
+            if (parsed.person2Answers) setPerson2Answers(parsed.person2Answers);
+            if (parsed.isPerson2Completed !== undefined) setIsPerson2Completed(parsed.isPerson2Completed);
+            if (parsed.person2ManualLang) setPerson2ManualLang(parsed.person2ManualLang);
+            if (parsed.person2ManualLang2) setPerson2ManualLang2(parsed.person2ManualLang2);
+
+            if (parsed.spouseBirthdate) setSpouseBirthdate(parsed.spouseBirthdate);
+            if (parsed.anniversaryDate) setAnniversaryDate(parsed.anniversaryDate);
+            if (parsed.completedMissions) setCompletedMissions(parsed.completedMissions);
+          } catch (e) {
+            console.error("Erro ao ler dados salvos:", e);
+          }
+        }
+      }, []);
+
+      useEffect(() => {
+        const dataToSave = {
+          isUnlocked,
+          activationEmail,
+          person1Name,
+          person1Answers,
+          isPerson1Completed,
+          person1ManualLang,
+          person1ManualLang2,
+          person2Name,
+          person2Answers,
+          isPerson2Completed,
+          person2ManualLang,
+          person2ManualLang2,
+          spouseBirthdate,
+          anniversaryDate,
+          completedMissions
+        };
+        localStorage.setItem('love_language_duo_app_data', JSON.stringify(dataToSave));
+      }, [
+        isUnlocked, activationEmail,
+        person1Name, person1Answers, isPerson1Completed, person1ManualLang, person1ManualLang2,
+        person2Name, person2Answers, isPerson2Completed, person2ManualLang, person2ManualLang2,
+        spouseBirthdate, anniversaryDate, completedMissions
+      ]);
+
+      const handleUnlockAttempt = (e) => {
+        e.preventDefault();
+        const emailTrimmed = activationEmail.trim().toLowerCase();
+        const codeTrimmed = activationInput.trim();
+
+        if (!emailTrimmed || !emailTrimmed.includes('@')) {
+          setActivationError('Por favor, digite um e-mail válido.');
+          return;
+        }
+
+        if (codeTrimmed === MASTER_KEY) {
+          setIsUnlocked(true);
+          setActivationError('');
+          return;
+        }
+
+        const expectedKey = calculateDeterministicKey(emailTrimmed);
+        const customGrantedKeys = JSON.parse(localStorage.getItem('app_custom_granted_keys') || '[]');
+
+        if (codeTrimmed.toUpperCase() === GENERAL_KEY.toUpperCase() || codeTrimmed.toUpperCase() === expectedKey || customGrantedKeys.includes(codeTrimmed.toUpperCase())) {
+          const deviceId = getDeviceId();
+          const registeredOwner = localStorage.getItem('app_registered_owner_email');
+
+          if (!registeredOwner) {
+            localStorage.setItem('app_registered_owner_email', emailTrimmed);
+            localStorage.setItem('app_registered_device_id', deviceId);
+            setIsUnlocked(true);
+            setActivationError('');
+          } else if (registeredOwner === emailTrimmed) {
+            setIsUnlocked(true);
+            setActivationError('');
+          } else {
+            setActivationError(`Este dispositivo já foi ativado com o e-mail: ${registeredOwner}. Adquira sua licença individual.`);
+          }
+        } else {
+          setActivationError('Chave de Ativação inválida. Verifique o código recebido.');
+        }
+      };
+
+      const handleAdminLogin = (e) => {
+        e.preventDefault();
+        if (adminMasterPassInput.trim() === MASTER_KEY) {
+          setIsAdminAuthenticated(true);
+          setAdminAuthError('');
+        } else {
+          setAdminAuthError('❌ Senha do Administrador Incorreta!');
+        }
+      };
+
+      const handleGenerateAdminKey = (e) => {
+        e.preventDefault();
+        if (!adminEmailTarget.trim() || !adminEmailTarget.includes('@')) return;
+
+        const targetEmail = adminEmailTarget.trim().toLowerCase();
+        const generatedKey = calculateDeterministicKey(targetEmail);
+
+        const currentKeys = JSON.parse(localStorage.getItem('app_custom_granted_keys') || '[]');
+        if (!currentKeys.includes(generatedKey)) {
+          currentKeys.push(generatedKey);
+          localStorage.setItem('app_custom_granted_keys', JSON.stringify(currentKeys));
+        }
+
+        setGeneratedKeyResult(generatedKey);
+      };
+
+      const calculateScores = (answersObj) => {
+        const scores = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+        Object.values(answersObj || {}).forEach(lang => {
+          if (scores[lang] !== undefined) {
+            scores[lang] += 1;
+          }
+        });
+        return scores;
+      };
+
+      const getRankedLanguages = (answersObj, manual1, manual2) => {
+        if (manual1) {
+          const result = [
+            { code: manual1, ...LANGUAGES_INFO[manual1], score: 12 }
+          ];
+          if (manual2 && manual2 !== manual1) {
+            result.push({ code: manual2, ...LANGUAGES_INFO[manual2], score: 8 });
+          } else {
+            const keys = ['A', 'B', 'C', 'D', 'E'].filter(k => k !== manual1);
+            result.push({ code: keys[0], ...LANGUAGES_INFO[keys[0]], score: 0 });
+          }
+          return result;
+        }
+
+        const scores = calculateScores(answersObj);
+        return Object.keys(scores)
+          .map(code => ({
+            code,
+            score: scores[code],
+            ...LANGUAGES_INFO[code]
+          }))
+          .sort((a, b) => b.score - a.score);
+      };
+
+      const rankedPerson1 = useMemo(() => {
+        return getRankedLanguages(person1Answers, person1ManualLang, person1ManualLang2);
+      }, [person1Answers, person1ManualLang, person1ManualLang2]);
+
+      const rankedPerson2 = useMemo(() => {
+        return getRankedLanguages(person2Answers, person2ManualLang, person2ManualLang2);
+      }, [person2Answers, person2ManualLang, person2ManualLang2]);
+
+      const comparisonChartData = useMemo(() => {
+        const scores1 = calculateScores(person1Answers);
+        const scores2 = calculateScores(person2Answers);
+        return Object.keys(LANGUAGES_INFO).map(code => ({
+          code,
+          name: LANGUAGES_INFO[code].title,
+          Pessoa1: person1ManualLang ? (person1ManualLang === code ? 12 : (person1ManualLang2 === code ? 8 : 0)) : (scores1[code] || 0),
+          Conjuge: person2ManualLang ? (person2ManualLang === code ? 12 : (person2ManualLang2 === code ? 8 : 0)) : (scores2[code] || 0),
+        }));
+      }, [person1Answers, person2Answers, person1ManualLang, person1ManualLang2, person2ManualLang, person2ManualLang2]);
+
+      const startTestForRole = (role) => {
+        setCurrentUserRole(role);
+        setAnswers(role === 'person1' ? person1Answers : person2Answers);
+        setCurrentIndex(0);
+        setIsStarted(true);
+        setIsCompleted(false);
+      };
+
+      const setManualLanguages = (role, primary, secondary) => {
+        if (role === 'person1') {
+          setPerson1ManualLang(primary);
+          setPerson1ManualLang2(secondary);
+          if (primary) setIsPerson1Completed(true);
+        } else {
+          setPerson2ManualLang(primary);
+          setPerson2ManualLang2(secondary);
+          if (primary) setIsPerson2Completed(true);
+        }
+      };
+
+      const handleSelectOption = (questionId, selectedLang) => {
+        const newAnswers = { ...answers, [questionId]: selectedLang };
+        setAnswers(newAnswers);
+
+        if (currentUserRole === 'person1') {
+          setPerson1Answers(newAnswers);
+        } else {
+          setPerson2Answers(newAnswers);
+        }
+
+        if (currentIndex < QUESTIONS.length - 1) {
+          setCurrentIndex(prev => prev + 1);
+        } else {
+          if (currentUserRole === 'person1') {
+            setIsPerson1Completed(true);
+          } else {
+            setIsPerson2Completed(true);
+          }
+          setIsStarted(false);
+          setIsCompleted(true);
+          setActiveTab('comparison');
+        }
+      };
+
+      const handlePrev = () => {
+        if (currentIndex > 0) {
+          setCurrentIndex(prev => prev - 1);
+        }
+      };
+
+      const toggleMission = (missionKey) => {
+        setCompletedMissions(prev => ({
+          ...prev,
+          [missionKey]: !prev[missionKey]
+        }));
+      };
+
+      const confirmResetAll = () => {
+        setPerson1Answers({});
+        setIsPerson1Completed(false);
+        setPerson2Answers({});
+        setIsPerson2Completed(false);
+        setPerson1ManualLang('');
+        setPerson1ManualLang2('');
+        setPerson2ManualLang('');
+        setPerson2ManualLang2('');
+        setSpouseBirthdate('');
+        setAnniversaryDate('');
+        setCompletedMissions({});
+        setAnswers({});
+        setCurrentIndex(0);
+        setIsStarted(false);
+        setIsCompleted(false);
+        setShowResetConfirm(false);
+        localStorage.removeItem('love_language_duo_app_data');
+      };
+
+      const calculateDaysRemaining = (dateString) => {
+        if (!dateString) return null;
+        const today = new Date();
+        const target = new Date(dateString);
+        target.setFullYear(today.getFullYear());
+        if (target < today) {
+          target.setFullYear(today.getFullYear() + 1);
+        }
+        const diffTime = Math.abs(target - today);
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      };
+
+      const daysToBirthdate = calculateDaysRemaining(spouseBirthdate);
+      const daysToAnniversary = calculateDaysRemaining(anniversaryDate);
+      const daysToValentines = calculateDaysRemaining(`${new Date().getFullYear()}-06-12`);
+
+      const progressPercent = Math.round(((currentIndex + 1) / QUESTIONS.length) * 100);
+      const currentQuestion = QUESTIONS[currentIndex];
+
+      const navigateTo = (tab) => {
+        if (tab === 'home') {
+          setIsStarted(false);
+          setActiveTab('home');
+        } else if (tab === 'comparison') {
+          setIsStarted(false);
+          setActiveTab('comparison');
+        } else if (tab === 'guide') {
+          setIsStarted(false);
+          setActiveTab('guide');
+        } else if (tab === 'planner') {
+          setIsStarted(false);
+          setActiveTab('planner');
+        }
+      };
+
+      // TELA DE BLOQUEIO (PAYWALL/CHAVE DE ATIVAÇÃO POR E-MAIL)
+      if (!isUnlocked) {
+        return (
+          <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden max-w-md mx-auto my-8 animate-fadeIn">
+            <div className="bg-gradient-to-r from-pink-600 to-purple-600 p-6 text-white text-center space-y-2">
+              <div className="w-16 h-16 bg-white/20 rounded-2xl mx-auto flex items-center justify-center p-2 border border-white/30">
+                <span className="text-3xl">🔒</span>
+              </div>
+              <h2 className="text-xl font-extrabold tracking-tight">Conteúdo Exclusivo</h2>
+              <p className="text-xs text-pink-100">
+                Linguagem de Casal • Mapeamento do Relacionamento
+              </p>
+            </div>
+
+            <div className="p-6 space-y-5 text-center">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Informe o seu <strong>E-mail de Compra</strong> e a <strong>Chave de Ativação</strong> recebida na sua plataforma de vendas ou no seu atendimento do consultório.
+              </p>
+
+              <form onSubmit={handleUnlockAttempt} className="space-y-3">
+                <div className="space-y-1 text-left">
+                  <label className="text-[11px] font-bold text-slate-600 ml-1">Seu E-mail:</label>
+                  <input
+                    type="email"
+                    value={activationEmail}
+                    onChange={(e) => setActivationEmail(e.target.value)}
+                    placeholder="seuemail@exemplo.com"
+                    required
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm font-medium focus:ring-2 focus:ring-pink-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <label className="text-[11px] font-bold text-slate-600 ml-1">Chave de Ativação / Voucher:</label>
+                  <input
+                    type="password"
+                    value={activationInput}
+                    onChange={(e) => setActivationInput(e.target.value)}
+                    placeholder="Digite sua chave ou CASAL-VIP"
+                    required
+                    className="w-full text-center px-4 py-3 rounded-xl border border-slate-300 text-sm font-bold uppercase tracking-wider focus:ring-2 focus:ring-pink-500 focus:outline-none"
+                  />
+                </div>
+
+                {activationError && (
+                  <p className="text-xs font-semibold text-rose-600 bg-rose-50 p-2.5 rounded-lg border border-rose-200 leading-snug text-left">
+                    ❌ {activationError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 text-xs uppercase tracking-wider mt-1"
+                >
+                  🔓 Liberar Acesso no Meu Celular
+                </button>
+              </form>
+
+              <div className="pt-4 border-t border-slate-100 text-center">
+                <button
+                  onClick={() => { setShowAdminModal(true); setIsAdminAuthenticated(false); setAdminAuthError(''); }}
+                  className="text-[11px] font-bold text-slate-400 hover:text-pink-600 underline transition-colors"
+                >
+                  ⚙️ Área do Administrador / Gerar Chave de Suporte
+                </button>
+              </div>
+
+              {showAdminModal && (
+                <div className="p-4 bg-slate-900 border border-slate-700 rounded-2xl text-left space-y-3 animate-fadeIn">
+                  <div className="flex justify-between items-center border-b border-slate-700 pb-2">
+                    <span className="text-xs font-extrabold text-pink-400">🛠️ Painel Restrito de Suporte (INJAVI)</span>
+                    <button onClick={() => setShowAdminModal(false)} className="text-xs text-slate-400 hover:text-white">✕ Fechar</button>
+                  </div>
+
+                  {!isAdminAuthenticated ? (
+                    <form onSubmit={handleAdminLogin} className="space-y-2">
+                      <p className="text-[11px] text-slate-300">Digite sua Senha Mestre de Administrador:</p>
+                      <input
+                        type="password"
+                        required
+                        value={adminMasterPassInput}
+                        onChange={(e) => setAdminMasterPassInput(e.target.value)}
+                        placeholder="Digite a Senha Mestre"
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none"
+                      />
+                      {adminAuthError && (
+                        <p className="text-[10px] text-rose-400 font-bold">{adminAuthError}</p>
+                      )}
+                      <button
+                        type="submit"
+                        className="w-full py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs rounded-lg transition-all"
+                      >
+                        🔓 Autenticar
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-[11px] text-slate-300">Digite o e-mail do cliente para obter a chave dele:</p>
+                      <form onSubmit={handleGenerateAdminKey} className="space-y-2">
+                        <input
+                          type="email"
+                          required
+                          value={adminEmailTarget}
+                          onChange={(e) => setAdminEmailTarget(e.target.value)}
+                          placeholder="emaildocliente@exemplo.com"
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none"
+                        />
+                        <button
+                          type="submit"
+                          className="w-full py-2 bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs rounded-lg transition-all"
+                        >
+                          ⚡ Gerar Chave VIP Individual
+                        </button>
+                      </form>
+
+                      {generatedKeyResult && (
+                        <div className="p-3 bg-slate-800 border border-emerald-500/40 rounded-xl space-y-1 text-center">
+                          <span className="text-[10px] font-bold text-emerald-400 uppercase block">Chave Pronta:</span>
+                          <strong className="text-sm font-black text-white tracking-wider block selection:bg-pink-500 selection:text-white">
+                            {generatedKeyResult}
+                          </strong>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="bg-white rounded-3xl shadow-xl border border-slate-200/80 overflow-hidden text-slate-800 pb-20 sm:pb-24 max-w-2xl mx-auto my-4">
+          <header className="bg-gradient-to-r from-pink-600 to-purple-600 p-5 text-white flex justify-between items-center">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-pink-200 block">Diagnóstico de Casal</span>
+              <h1 className="text-lg font-black tracking-tight">As 5 Linguagens do Amor</h1>
+            </div>
+            <button
+              onClick={() => { localStorage.removeItem('love_language_duo_app_data'); setIsUnlocked(false); }}
+              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl backdrop-blur-xs transition-all"
+            >
+              🔒 Sair
+            </button>
+          </header>
+
+          <nav className="flex bg-slate-100 p-1.5 border-b border-slate-200 text-xs font-bold text-slate-600">
+            <button
+              onClick={() => navigateTo('home')}
+              className={`flex-1 py-2 rounded-xl transition-all ${activeTab === 'home' && !isStarted ? 'bg-white text-pink-600 shadow-xs' : 'hover:text-slate-900'}`}
+            >
+              🏠 Início
+            </button>
+            <button
+              onClick={() => navigateTo('comparison')}
+              className={`flex-1 py-2 rounded-xl transition-all ${activeTab === 'comparison' ? 'bg-white text-pink-600 shadow-xs' : 'hover:text-slate-900'}`}
+            >
+              📊 Comparativo
+            </button>
+            <button
+              onClick={() => navigateTo('guide')}
+              className={`flex-1 py-2 rounded-xl transition-all ${activeTab === 'guide' ? 'bg-white text-pink-600 shadow-xs' : 'hover:text-slate-900'}`}
+            >
+              💡 Guia Prático
+            </button>
+            <button
+              onClick={() => navigateTo('planner')}
+              className={`flex-1 py-2 rounded-xl transition-all ${activeTab === 'planner' ? 'bg-white text-pink-600 shadow-xs' : 'hover:text-slate-900'}`}
+            >
+              📅 Datas & Ações
+            </button>
+          </nav>
+
+          <main className="p-5">
+            {isStarted ? (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold text-slate-500">
+                    <span>{currentUserRole === 'person1' ? person1Name : person2Name} • Pergunta {currentIndex + 1} de {QUESTIONS.length}</span>
+                    <span>{progressPercent}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-pink-500 transition-all duration-300" style={{ width: `${progressPercent}%` }}></div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="text-sm font-bold text-slate-800">Qual opção faz você se sentir mais amado(a)?</h3>
+                  
+                  <button
+                    onClick={() => handleSelectOption(currentQuestion.id, currentQuestion.optionA.lang)}
+                    className="w-full p-4 bg-slate-50 hover:bg-pink-50 border border-slate-200 hover:border-pink-300 rounded-2xl text-left transition-all active:scale-98 flex items-start space-x-3 group"
+                  >
+                    <span className="w-6 h-6 rounded-full bg-slate-200 group-hover:bg-pink-600 group-hover:text-white flex items-center justify-center text-xs font-bold text-slate-600 shrink-0 mt-0.5">A</span>
+                    <span className="text-xs sm:text-sm font-medium text-slate-800 group-hover:text-pink-950">{currentQuestion.optionA.text}</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleSelectOption(currentQuestion.id, currentQuestion.optionB.lang)}
+                    className="w-full p-4 bg-slate-50 hover:bg-pink-50 border border-slate-200 hover:border-pink-300 rounded-2xl text-left transition-all active:scale-98 flex items-start space-x-3 group"
+                  >
+                    <span className="w-6 h-6 rounded-full bg-slate-200 group-hover:bg-pink-600 group-hover:text-white flex items-center justify-center text-xs font-bold text-slate-600 shrink-0 mt-0.5">B</span>
+                    <span className="text-xs sm:text-sm font-medium text-slate-800 group-hover:text-pink-950">{currentQuestion.optionB.text}</span>
+                  </button>
+                </div>
+
+                {currentIndex > 0 && (
+                  <button onClick={handlePrev} className="text-xs font-bold text-slate-400 hover:text-slate-600">
+                    ← Voltar pergunta anterior
+                  </button>
+                )}
+              </div>
+            ) : activeTab === 'home' ? (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="text-center space-y-2">
+                  <h2 className="text-xl font-black text-slate-900">Bem-vindo(a) ao Teste do Casal</h2>
+                  <p className="text-xs text-slate-500">Descubra como você e seu parceiro(a) expressam e recebem amor.</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 bg-pink-50/60 border border-pink-200 rounded-2xl space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-pink-700">Pessoa 1</span>
+                      {isPerson1Completed && <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Concluído ✓</span>}
+                    </div>
+                    <input
+                      type="text"
+                      value={person1Name}
+                      onChange={(e) => setPerson1Name(e.target.value)}
+                      placeholder="Nome da Pessoa 1"
+                      className="w-full px-3 py-2 bg-white border border-pink-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    />
+                    <button
+                      onClick={() => startTestForRole('person1')}
+                      className="w-full py-2.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all"
+                    >
+                      {isPerson1Completed ? '🔄 Refazer Teste' : '▶ Responder 30 Perguntas'}
+                    </button>
+                    
+                    <div className="pt-2 border-t border-pink-200/60 text-[11px] space-y-1">
+                      <span className="font-bold text-slate-600 block">Ou selecione diretamente:</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <select
+                          value={person1ManualLang}
+                          onChange={(e) => setManualLanguages('person1', e.target.value, person1ManualLang2)}
+                          className="w-full text-[10px] p-1.5 bg-white border border-pink-200 rounded-lg font-medium"
+                        >
+                          <option value="">Linguagem 1º</option>
+                          {Object.keys(LANGUAGES_INFO).map(k => <option key={k} value={k}>{LANGUAGES_INFO[k].title}</option>)}
+                        </select>
+                        <select
+                          value={person1ManualLang2}
+                          onChange={(e) => setManualLanguages('person1', person1ManualLang, e.target.value)}
+                          className="w-full text-[10px] p-1.5 bg-white border border-pink-200 rounded-lg font-medium"
+                        >
+                          <option value="">Linguagem 2º</option>
+                          {Object.keys(LANGUAGES_INFO).map(k => <option key={k} value={k}>{LANGUAGES_INFO[k].title}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-purple-50/60 border border-purple-200 rounded-2xl space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-purple-700">Pessoa 2 (Cônjuge)</span>
+                      {isPerson2Completed && <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Concluído ✓</span>}
+                    </div>
+                    <input
+                      type="text"
+                      value={person2Name}
+                      onChange={(e) => setPerson2Name(e.target.value)}
+                      placeholder="Nome do Cônjuge"
+                      className="w-full px-3 py-2 bg-white border border-purple-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                    <button
+                      onClick={() => startTestForRole('person2')}
+                      className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all"
+                    >
+                      {isPerson2Completed ? '🔄 Refazer Teste' : '▶ Responder 30 Perguntas'}
+                    </button>
+
+                    <div className="pt-2 border-t border-purple-200/60 text-[11px] space-y-1">
+                      <span className="font-bold text-slate-600 block">Ou selecione diretamente:</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <select
+                          value={person2ManualLang}
+                          onChange={(e) => setManualLanguages('person2', e.target.value, person2ManualLang2)}
+                          className="w-full text-[10px] p-1.5 bg-white border border-purple-200 rounded-lg font-medium"
+                        >
+                          <option value="">Linguagem 1º</option>
+                          {Object.keys(LANGUAGES_INFO).map(k => <option key={k} value={k}>{LANGUAGES_INFO[k].title}</option>)}
+                        </select>
+                        <select
+                          value={person2ManualLang2}
+                          onChange={(e) => setManualLanguages('person2', person2ManualLang, e.target.value)}
+                          className="w-full text-[10px] p-1.5 bg-white border border-purple-200 rounded-lg font-medium"
+                        >
+                          <option value="">Linguagem 2º</option>
+                          {Object.keys(LANGUAGES_INFO).map(k => <option key={k} value={k}>{LANGUAGES_INFO[k].title}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {(isPerson1Completed || isPerson2Completed) && (
+                  <button
+                    onClick={() => setActiveTab('comparison')}
+                    className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-md"
+                  >
+                    📊 Ver Gráfico & Comparativo Completo
+                  </button>
+                )}
+              </div>
+            ) : activeTab === 'comparison' ? (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="text-center space-y-1">
+                  <h2 className="text-lg font-black text-slate-900">Comparativo do Casal</h2>
+                  <p className="text-xs text-slate-500">Veja o cruzamento de linguagens entre {person1Name} e {person2Name}.</p>
+                </div>
+
+                {window.Recharts && (
+                  <div className="bg-slate-50 p-4 border border-slate-200 rounded-2xl h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={comparisonChartData}>
+                        <XAxis dataKey="code" textAnchor="middle" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <Tooltip />
+                        <Bar dataKey="Pessoa1" fill="#ec4899" name={person1Name} radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="Conjuge" fill="#8b5cf6" name={person2Name} radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 bg-pink-50/50 border border-pink-200 rounded-2xl space-y-2">
+                    <h3 className="text-xs font-black text-pink-700 uppercase tracking-wider">{person1Name}</h3>
+                    {rankedPerson1.slice(0, 2).map((item, i) => (
+                      <div key={item.code} className="text-xs flex justify-between items-center bg-white p-2 rounded-xl border border-pink-100">
+                        <span>{item.icon} {item.title}</span>
+                        <span className="font-bold text-pink-600">{item.score} pts</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-4 bg-purple-50/50 border border-purple-200 rounded-2xl space-y-2">
+                    <h3 className="text-xs font-black text-purple-700 uppercase tracking-wider">{person2Name}</h3>
+                    {rankedPerson2.slice(0, 2).map((item, i) => (
+                      <div key={item.code} className="text-xs flex justify-between items-center bg-white p-2 rounded-xl border border-purple-100">
+                        <span>{item.icon} {item.title}</span>
+                        <span className="font-bold text-purple-600">{item.score} pts</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : activeTab === 'guide' ? (
+              <div className="space-y-4 animate-fadeIn text-xs text-slate-700">
+                <h2 className="text-base font-black text-slate-900">💡 Como Aplicar no Dia a Dia</h2>
+                <div className="space-y-3">
+                  {Object.keys(LANGUAGES_INFO).map(key => {
+                    const info = LANGUAGES_INFO[key];
+                    return (
+                      <div key={key} className="p-3 border border-slate-200 rounded-xl space-y-1 bg-slate-50">
+                        <div className="flex items-center space-x-2 font-bold text-slate-900">
+                          <span>{info.icon}</span>
+                          <span>{info.title}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-relaxed">{info.desc}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-fadeIn text-xs text-slate-700">
+                <h2 className="text-base font-black text-slate-900">📅 Calendário de Ações & Datas</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <label className="font-bold text-slate-800 block">Aniversário do Cônjuge:</label>
+                    <input
+                      type="date"
+                      value={spouseBirthdate}
+                      onChange={(e) => setSpouseBirthdate(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs"
+                    />
+                    {daysToBirthdate !== null && <p className="text-[11px] font-bold text-pink-600">Faltam {daysToBirthdate} dias!</p>}
+                  </div>
+
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <label className="font-bold text-slate-800 block">Aniversário de Namoro/Casamento:</label>
+                    <input
+                      type="date"
+                      value={anniversaryDate}
+                      onChange={(e) => setAnniversaryDate(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs"
+                    />
+                    {daysToAnniversary !== null && <p className="text-[11px] font-bold text-purple-600">Faltam {daysToAnniversary} dias!</p>}
+                  </div>
+                </div>
+              </div>
+            )}
+          </main>
+
+          <footer className="text-center space-y-2 py-4 border-t border-slate-200 bg-slate-50">
+            <p className="text-[11px] text-slate-400">
+              Licenciado para: <strong className="text-slate-600">{activationEmail || 'Usuário VIP'}</strong>
+            </p>
+            <button
+              onClick={() => { setShowAdminModal(true); setIsAdminAuthenticated(false); setAdminAuthError(''); }}
+              className="text-[11px] font-bold text-slate-400 hover:text-pink-600 underline transition-colors"
+            >
+              ⚙️ Gerar Chave de Cliente (ADM)
+            </button>
+
+            {showAdminModal && (
+              <div className="p-4 bg-slate-900 text-slate-100 rounded-2xl text-left space-y-3 animate-fadeIn mt-3 mx-4">
+                <div className="flex justify-between items-center border-b border-slate-700 pb-2">
+                  <span className="text-xs font-extrabold text-pink-400">🛠️ Área Secreta do Administrador</span>
+                  <button onClick={() => setShowAdminModal(false)} className="text-xs text-slate-400 hover:text-white">✕ Fechar</button>
+                </div>
+
+                {!isAdminAuthenticated ? (
+                  <form onSubmit={handleAdminLogin} className="space-y-2">
+                    <p className="text-[11px] text-slate-300">Digite sua Senha Mestre de Administrador:</p>
+                    <input
+                      type="password"
+                      required
+                      value={adminMasterPassInput}
+                      onChange={(e) => setAdminMasterPassInput(e.target.value)}
+                      placeholder="Digite a Senha Mestre"
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none"
+                    />
+                    {adminAuthError && (
+                      <p className="text-[10px] text-rose-400 font-bold">{adminAuthError}</p>
+                    )}
+                    <button
+                      type="submit"
+                      className="w-full py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs rounded-lg transition-all"
+                    >
+                      🔓 Autenticar
+                    </button>
+                  </form>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-[11px] text-slate-300">Digite o e-mail do paciente para gerar a chave dele:</p>
+                    <form onSubmit={handleGenerateAdminKey} className="space-y-2">
+                      <input
+                        type="email"
+                        required
+                        value={adminEmailTarget}
+                        onChange={(e) => setAdminEmailTarget(e.target.value)}
+                        placeholder="emaildocliente@exemplo.com"
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="w-full py-2 bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs rounded-lg transition-all"
+                      >
+                        ⚡ Gerar Chave VIP
+                      </button>
+                    </form>
+
+                    {generatedKeyResult && (
+                      <div className="p-3 bg-slate-800 border border-emerald-500/40 rounded-xl space-y-1 text-center">
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase block">Chave Gerada:</span>
+                        <strong className="text-sm font-black text-white tracking-wider block selection:bg-pink-500 selection:text-white">
+                          {generatedKeyResult}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
